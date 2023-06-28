@@ -1,0 +1,11 @@
+* Usage
+Put this in your init.el file:
+#+BEGIN_SRC emacs-lisp
+;; Chargebee
+(load (concat user-emacs-directory "chargebee.el/chargebee.el"))
+(use-package chargebee
+  :ensure nil
+  :custom
+  (chargebee-api-server "your-api-server")
+  (chargebee-api-key "your-api-key"))
+#+END_SRC
