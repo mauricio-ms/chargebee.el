@@ -15,6 +15,8 @@
   :type 'string
   :group 'chargebee)
 
+(require 'widget)
+
 (defgroup chargebee-faces nil
   "Faces used by Chargebee."
   :group 'chargebee)
@@ -22,6 +24,13 @@
 (defface chargebee-section-head
   '((((background  dark)) :foreground "green")
     (((background light)) :foreground "black"))
+  "Fringe face for current position."
+  :group 'chargebee-faces)
+
+;; TODO - Check if it will be used or not
+(defface chargebee-button-temp4
+  '((((background  dark)) :foreground "orange" :weight ultra-bold)
+    (((background light)) :foreground "black" :weight ultra-bold))
   "Fringe face for current position."
   :group 'chargebee-faces)
 
@@ -82,49 +91,74 @@
 	      (insert ?\n)
 	      (insert ?\n)
 	      )))))
+
     
-    (deferred:$
-      (request-deferred (format "https://%s.chargebee.com/api/v2/invoices" chargebee-api-server) 
-			:type "GET"
-			:params `(("customer_id[is]" . ,customer-id))
-			:headers `(("Content-Type" . "application/json")
-				   ,(chargebee--authorization-header))
-			:parser 'json-read)
-      (deferred:nextc it
-	(lambda (response)
-	  (let ((invoices (get--attr (request-response-data response) '(list))))
-	    (with-current-buffer buffer
-	      (chargebee--add-section-head (format "Invoices (%d)" (seq-length invoices)))
-	      (seq-do
-	       (lambda (invoice)
-		 (let ((currency-code (get--attr invoice '(invoice currency_code))))
-		   (insert (propertize (format "%-10s" (get--attr invoice '(invoice id))) 
-				       'font-lock-face 'chargebee-yellow))
+    (chargebee--write-invoices buffer nil)
+    (with-current-buffer buffer
+      (outline-minor-mode)
+      (setq-local outline-regexp ">")
+      ;; Hide all sections
+      ;; (outline-hide-body)
+      ;; Set keybinding for toggling sections
+      (define-key outline-minor-mode-map (kbd "<tab>") 'outline-toggle-children)
+      (font-lock-mode)
 
-		   (insert (format "%-20s %s %s"
-				   ;; TODO - 3600 hardcoded to solveconsider daylight saving, check how it's the appropriate way to handle it
-				   (format-time-string "%Y-%m-%dT%T" (get--attr invoice '(invoice date)) 3600)
-				   currency-code 
-				   (chargebee--to-decimal (get--attr invoice '(invoice total)))))
-
-		   (let ((refund-amount (chargebee--get-refund-amount-for-invoice invoice)))
-		     (if refund-amount
-			 (insert (propertize (format " credits issued %s %s" currency-code refund-amount) 'font-lock-face 'chargebee-red)))))
-		 (insert ?\n)) invoices)
-
-	      (add-hook 'post-command-hook #'chargebee--highlight-current-line nil t)
-	      ;; TODO - Buttons next and previous, should use go-to function to rewrite the contents, previous pages needs to be cached
-	      (outline-minor-mode)
-  	      (setq-local outline-regexp ">")
-	      ;; Hide all sections
-	      (outline-hide-body)
-	      ;; Set keybinding for toggling sections
-	      (define-key outline-minor-mode-map (kbd "<tab>") 'outline-toggle-children)
-	      (font-lock-mode)
-
-	      ;; TODO - Implement pagination (use limit to specify the items per page, use next_offset parameter of the response to pass in the offset parameter of the next request)
-	    (switch-to-buffer buffer))))))))
+      ;; TODO - Implement pagination (use limit to specify the items per page, use next_offset parameter of the response to pass in the offset parameter of the next request)
+      (switch-to-buffer buffer)
+      ;; (add-hook 'post-command-hook #'chargebee--highlight-current-line nil t) TODO - FIX IT TO NO REMOVE WIDGET FUNCTIONALITY
+      ;; TODO - Buttons next and previous, should use go-to function to rewrite the contents, previous pages needs to be cached
+      )))
 ;; (chargebee-customer)
+
+;; TODO - Continue function to use goto and replace the invoices instead generate new sections
+;; TODO - Calculate the local to write the invoices content, because the request can finish before that the header part request
+(defun chargebee--write-invoices (buffer offset)
+  (message "chargebee--write-invoices: %s" offset)
+  (deferred:$
+    (request-deferred (format "https://%s.chargebee.com/api/v2/invoices"
+			      chargebee-api-server)
+		      :type "GET"
+		      :params `(
+				("customer_id[is]" . ,customer-id)
+				("limit" . "2")
+				("offset" . ,(or offset "")))
+		      :headers `(("Content-Type" . "application/json")
+				 ,(chargebee--authorization-header))
+		      :parser 'json-read)
+  
+  (deferred:nextc it
+    (lambda (response)
+      (let* ((invoices-response (request-response-data response))
+	     (invoices (get--attr invoices-response '(list))))
+	(with-current-buffer buffer
+	  (chargebee--add-section-head (format "Invoices (%d)" (seq-length invoices)))
+	  (seq-do #'chargebee--write-invoice invoices)
+	  (let ((next-offset (get--attr invoices-response '(next_offset))))
+	    (message "NEXT: %s" next-offset)
+	    (if next-offset
+		(widget-create 'link
+			       :notify (lambda (&rest ignore)
+					 (chargebee--write-invoices buffer next-offset))
+			       "NEXT") 
+	      ;; (insert (propertize "NEXT" 'font-lock-face 'chargebee-button-temp4))
+	      ))
+	  (insert ?\n)))))))
+
+(defun chargebee--write-invoice (invoice)
+  (let ((currency-code (get--attr invoice '(invoice currency_code))))
+    (insert (propertize (format "%-10s" (get--attr invoice '(invoice id))) 
+			'font-lock-face 'chargebee-yellow))
+
+    (insert (format "%-20s %s %s"
+		    ;; TODO - 3600 hardcoded to solveconsider daylight saving, check how it's the appropriate way to handle it
+		    (format-time-string "%Y-%m-%dT%T" (get--attr invoice '(invoice date)) 3600)
+		    currency-code 
+		    (chargebee--to-decimal (get--attr invoice '(invoice total)))))
+
+    (let ((refund-amount (chargebee--get-refund-amount-for-invoice invoice)))
+      (if refund-amount
+	  (insert (propertize (format " credits issued %s %s" currency-code refund-amount) 'font-lock-face 'chargebee-red))))
+    (insert ?\n)))
 
 (defun chargebee--highlight-current-line ()
   "Apply bold face to the current line in the buffer."
