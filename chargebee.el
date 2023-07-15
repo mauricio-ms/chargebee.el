@@ -89,31 +89,28 @@
 	      (insert (format "State:      \t%s\n" (get--attr customer '(billing_address state))))
 	      (insert (format "Status:     \t%s\n" (get--attr customer '(billing_address validation_status))))
 	      (insert ?\n)
-	      (insert ?\n)
-	      )))))
+	      (insert ?\n)))))
+      (deferred:nextc it
+	(lambda (response)
+	  (chargebee--write-invoices buffer nil '())))
+      (deferred:nextc it
+	(lambda (response)
+	  (with-current-buffer buffer
+	    (outline-minor-mode)
+	    (setq-local outline-regexp ">")
+	    ;; Set keybinding for toggling sections
+	    (define-key outline-minor-mode-map (kbd "<tab>") 'outline-toggle-children)
+	    (font-lock-mode)
 
-    
-    (chargebee--write-invoices buffer nil)
-    (with-current-buffer buffer
-      (outline-minor-mode)
-      (setq-local outline-regexp ">")
-      ;; Hide all sections
-      ;; (outline-hide-body)
-      ;; Set keybinding for toggling sections
-      (define-key outline-minor-mode-map (kbd "<tab>") 'outline-toggle-children)
-      (font-lock-mode)
-
-      ;; TODO - Implement pagination (use limit to specify the items per page, use next_offset parameter of the response to pass in the offset parameter of the next request)
-      (switch-to-buffer buffer)
-      ;; (add-hook 'post-command-hook #'chargebee--highlight-current-line nil t) TODO - FIX IT TO NO REMOVE WIDGET FUNCTIONALITY
-      ;; TODO - Buttons next and previous, should use go-to function to rewrite the contents, previous pages needs to be cached
-      )))
+	    (switch-to-buffer buffer)
+	    (add-hook 'post-command-hook #'chargebee--highlight-current-line nil t)
+	    ;; TODO - FIX IT TO NO REMOVE WIDGET FUNCTIONALITY
+	    ;; Before open, set the cursor on point-min and highlight first line (goto-char (point-min))
+	    ))))))
 ;; (chargebee-customer)
 
-;; TODO - Continue function to use goto and replace the invoices instead generate new sections
-;; TODO - Calculate the local to write the invoices content, because the request can finish before that the header part request
-(defun chargebee--write-invoices (buffer offset)
-  (message "chargebee--write-invoices: %s" offset)
+(defun chargebee--write-invoices (buffer offset pages-history)
+  (message "chargebee--write-invoices: %s %s" offset pages-history)
   (deferred:$
     (request-deferred (format "https://%s.chargebee.com/api/v2/invoices"
 			      chargebee-api-server)
@@ -133,15 +130,30 @@
 	(with-current-buffer buffer
 	  (chargebee--add-section-head (format "Invoices (%d)" (seq-length invoices)))
 	  (seq-do #'chargebee--write-invoice invoices)
-	  (let ((next-offset (get--attr invoices-response '(next_offset))))
-	    (message "NEXT: %s" next-offset)
-	    (if next-offset
+	  (if pages-history
+	      (progn
 		(widget-create 'link
 			       :notify (lambda (&rest ignore)
-					 (chargebee--write-invoices buffer next-offset))
-			       "NEXT") 
-	      ;; (insert (propertize "NEXT" 'font-lock-face 'chargebee-button-temp4))
-	      ))
+					 (save-excursion
+					   (goto-char (point-min))
+					   (forward-line 22)
+					   (delete-region (point) (point-max)))
+					 (let ((previous-offset (pop pages-history)))
+					   (chargebee--write-invoices buffer previous-offset pages-history)))
+			       "PREVIOUS")
+		(insert "  ")))
+	  (let ((next-offset (get--attr invoices-response '(next_offset))))
+	    (if next-offset
+		(progn
+		  (widget-create 'link
+				 :notify (lambda (&rest ignore)
+					   (save-excursion
+					     (goto-char (point-min))
+					     (forward-line 22)
+					     (delete-region (point) (point-max)))
+					   (push offset pages-history)
+					   (chargebee--write-invoices buffer next-offset pages-history))
+				 "NEXT"))))
 	  (insert ?\n)))))))
 
 (defun chargebee--write-invoice (invoice)
@@ -166,10 +178,18 @@
     (save-excursion
       (goto-char (point-min))
       (while (not (eobp))
-        (if (= (line-number-at-pos) current-line)
-            (overlay-put (make-overlay (line-beginning-position) (line-end-position)) 'face 'chargebee-highlight)
-          (chargebee--delete-overlays-specifying 'face))
-        (forward-line)))))
+	(let ((line-start (line-beginning-position))
+	      (line-end (line-end-position)))
+	  (if (= (line-number-at-pos) current-line)
+              (overlay-put (make-overlay line-start line-end) 'face 'chargebee-highlight)
+	    (progn
+	      ;; GAMBIARRA to not remove widget button feature
+	      (let ((line-start (buffer-substring line-start (1+ line-start)))
+		    (line-end ()))
+		(if (not (and (string= "[" line)))
+	            (chargebee--delete-overlays-specifying 'face)))))
+          (forward-line) )
+        ))))
 
 (defun chargebee--delete-overlays-specifying (prop)
   (let ((overlays (overlays-at (+ 1 (point)))))
