@@ -27,13 +27,6 @@
   "Fringe face for current position."
   :group 'chargebee-faces)
 
-;; TODO - Check if it will be used or not
-(defface chargebee-button-temp4
-  '((((background  dark)) :foreground "orange" :weight ultra-bold)
-    (((background light)) :foreground "black" :weight ultra-bold))
-  "Fringe face for current position."
-  :group 'chargebee-faces)
-
 (defface chargebee-yellow
   '((((background  dark)) :foreground "yellow")
     (((background light)) :foreground "black"))
@@ -104,8 +97,7 @@
 
 	    (switch-to-buffer buffer)
 	    (add-hook 'post-command-hook #'chargebee--highlight-current-line nil t)
-	    ;; TODO - FIX IT TO NO REMOVE WIDGET FUNCTIONALITY
-	    ;; Before open, set the cursor on point-min and highlight first line (goto-char (point-min))
+	    (chargebee--highlight-current-line)
 	    ))))))
 ;; (chargebee-customer)
 
@@ -178,17 +170,17 @@
     (save-excursion
       (goto-char (point-min))
       (while (not (eobp))
-	(let ((line-start (line-beginning-position))
-	      (line-end (line-end-position)))
+	(let ((line-start-pos (line-beginning-position))
+	      (line-end-pos (line-end-position)))
 	  (if (= (line-number-at-pos) current-line)
-              (overlay-put (make-overlay line-start line-end) 'face 'chargebee-highlight)
+              (overlay-put (make-overlay line-start-pos line-end-pos) 'face 'chargebee-highlight)
 	    (progn
 	      ;; GAMBIARRA to not remove widget button feature
-	      (let ((line-start (buffer-substring line-start (1+ line-start)))
-		    (line-end ()))
-		(if (not (and (string= "[" line)))
+	      (let ((line-start (buffer-substring line-start-pos (1+ line-start-pos)))
+		    (line-end (buffer-substring (1- line-end-pos) line-end-pos)))
+		(if (not (and (string= "[" line-start) (string= "]" line-end)))
 	            (chargebee--delete-overlays-specifying 'face)))))
-          (forward-line) )
+          (forward-line))
         ))))
 
 (defun chargebee--delete-overlays-specifying (prop)
