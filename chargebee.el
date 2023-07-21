@@ -45,8 +45,8 @@
   "Basic face for highlighting."
   :group 'chargebee-faces)
 
-(defun chargebee-customer ()
-  (interactive)
+(defun chargebee-customer (customer-id)
+  (interactive "sCustomer Id: ")
   (let ((buffer (get-buffer-create "*Chargebee-Customer*")))
     (with-current-buffer buffer
       (erase-buffer))
@@ -85,7 +85,7 @@
 	      (insert ?\n)))))
       (deferred:nextc it
 	(lambda (response)
-	  (chargebee--write-invoices buffer nil '())))
+	  (chargebee--write-invoices buffer customer-id nil '())))
       (deferred:nextc it
 	(lambda (response)
 	  (with-current-buffer buffer
@@ -101,7 +101,7 @@
 	    ))))))
 ;; (chargebee-customer)
 
-(defun chargebee--write-invoices (buffer offset pages-history)
+(defun chargebee--write-invoices (buffer customer-id offset pages-history)
   (message "chargebee--write-invoices: %s %s" offset pages-history)
   (deferred:$
     (request-deferred (format "https://%s.chargebee.com/api/v2/invoices"
@@ -131,7 +131,7 @@
 					   (forward-line 22)
 					   (delete-region (point) (point-max)))
 					 (let ((previous-offset (pop pages-history)))
-					   (chargebee--write-invoices buffer previous-offset pages-history)))
+					   (chargebee--write-invoices buffer customer-id previous-offset pages-history)))
 			       "PREVIOUS")
 		(insert "  ")))
 	  (let ((next-offset (get--attr invoices-response '(next_offset))))
@@ -144,7 +144,7 @@
 					     (forward-line 22)
 					     (delete-region (point) (point-max)))
 					   (push offset pages-history)
-					   (chargebee--write-invoices buffer next-offset pages-history))
+					   (chargebee--write-invoices buffer customer-id next-offset pages-history))
 				 "NEXT"))))
 	  (insert ?\n)))))))
 
