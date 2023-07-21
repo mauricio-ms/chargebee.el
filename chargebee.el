@@ -52,40 +52,52 @@
       (erase-buffer))
 
     (deferred:$
-      (request-deferred (format "https://%s.chargebee.com/api/v2/customers/%s" chargebee-api-server customer-id)
-			:type "GET"
-			:headers `(("Content-Type" . "application/json")
-				   ,(chargebee--authorization-header))
-			:parser 'json-read)
-      (deferred:nextc it
-	(lambda (response)
-	  (let ((customer (get--attr (request-response-data response) '(customer))))
-	    (with-current-buffer buffer
-	      (insert (format "Customer:   %s\n" (get--attr customer '(id))))
-	      (insert (format "First Name: %s\n" (get--attr customer '(first_name))))
-	      (insert (format "Last Name:  %s\n" (get--attr customer '(last_name))))
-	      (insert (format "Email:      %s\n" (get--attr customer '(email))))
-	      (insert ?\n)
-	      (insert ?\n)
-	      (chargebee--add-section-head "Billing Address")
-	      (insert (format "First Name: \t%s\n" (get--attr customer '(billing_address first_name))))
-	      (insert (format "Last Name:  \t%s\n" (get--attr customer '(billing_address last_name))))
-	      (insert (format "Company:    \t%s\n" (get--attr customer '(billing_address company))))
-	      (insert (format "Email:      \t%s\n" (get--attr customer '(billing_address email))))
-	      (insert (format "Phone:      \t%s\n" (get--attr customer '(billing_address phone))))
-	      (insert (format "Line 1:     \t%s\n" (get--attr customer '(billing_address line1))))
-	      (insert (format "Line 2:     \t%s\n" (get--attr customer '(billing_address line2))))
-	      (insert (format "Line 3:     \t%s\n" (get--attr customer '(billing_address line3))))
-	      (insert (format "City:       \t%s\n" (get--attr customer '(billing_address city))))
-	      (insert (format "Zip:        \t%s\n" (get--attr customer '(billing_address zip))))
-	      (insert (format "Country:    \t%s\n" (get--attr customer '(billing_address country))))
-	      (insert (format "State:      \t%s\n" (get--attr customer '(billing_address state))))
-	      (insert (format "Status:     \t%s\n" (get--attr customer '(billing_address validation_status))))
-	      (insert ?\n)
-	      (insert ?\n)))))
-      (deferred:nextc it
-	(lambda (response)
-	  (chargebee--write-invoices buffer customer-id nil '())))
+      (deferred:$
+	(request-deferred (format "https://%s.chargebee.com/api/v2/customers/%s" chargebee-api-server customer-id)
+			  :type "GET"
+			  :headers `(("Content-Type" . "application/json")
+				     ,(chargebee--authorization-header))
+			  :parser 'json-read)
+	(deferred:nextc it
+	   (lambda (response)
+	     (if (not (= 200 (request-response-status-code response)))
+	 	 (deferred:fail (format "Customer %s not found" customer-id))
+	       response)))
+	(deferred:nextc it
+	  (lambda (response)
+	    (let ((customer (get--attr (request-response-data response) '(customer))))
+	      (with-current-buffer buffer
+		(insert (format "Customer:   %s\n" (get--attr customer '(id))))
+		(insert (format "First Name: %s\n" (get--attr customer '(first_name))))
+		(insert (format "Last Name:  %s\n" (get--attr customer '(last_name))))
+		(insert (format "Email:      %s\n" (get--attr customer '(email))))
+		(insert ?\n)
+		(insert ?\n)
+		(chargebee--add-section-head "Billing Address")
+		(insert (format "First Name: \t%s\n" (get--attr customer '(billing_address first_name))))
+		(insert (format "Last Name:  \t%s\n" (get--attr customer '(billing_address last_name))))
+		(insert (format "Company:    \t%s\n" (get--attr customer '(billing_address company))))
+		(insert (format "Email:      \t%s\n" (get--attr customer '(billing_address email))))
+		(insert (format "Phone:      \t%s\n" (get--attr customer '(billing_address phone))))
+		(insert (format "Line 1:     \t%s\n" (get--attr customer '(billing_address line1))))
+		(insert (format "Line 2:     \t%s\n" (get--attr customer '(billing_address line2))))
+		(insert (format "Line 3:     \t%s\n" (get--attr customer '(billing_address line3))))
+		(insert (format "City:       \t%s\n" (get--attr customer '(billing_address city))))
+		(insert (format "Zip:        \t%s\n" (get--attr customer '(billing_address zip))))
+		(insert (format "Country:    \t%s\n" (get--attr customer '(billing_address country))))
+		(insert (format "State:      \t%s\n" (get--attr customer '(billing_address state))))
+		(insert (format "Status:     \t%s\n" (get--attr customer '(billing_address validation_status))))
+		(insert ?\n)
+		(insert ?\n)))))
+	(deferred:nextc it
+	  (lambda (response)
+	    (chargebee--write-invoices buffer customer-id nil '()))))
+
+      (deferred:error it
+	(lambda (err)
+	  (with-current-buffer buffer
+	    (insert (nth 1 err)))))
+      
       (deferred:nextc it
 	(lambda (response)
 	  (with-current-buffer buffer
@@ -99,7 +111,8 @@
 	    (add-hook 'post-command-hook #'chargebee--highlight-current-line nil t)
 	    (chargebee--highlight-current-line)
 	    ))))))
-;; (chargebee-customer)
+;; (chargebee-customer "123")
+;; (chargebee-customer "stage_77882")
 
 (defun chargebee--write-invoices (buffer customer-id offset pages-history)
   (message "chargebee--write-invoices: %s %s" offset pages-history)
