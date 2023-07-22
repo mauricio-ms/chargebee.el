@@ -16,27 +16,29 @@
   :group 'chargebee)
 
 (require 'widget)
+(require 'chargebee-minor-mode (expand-file-name "./chargebee-minor-mode.el"
+						 (file-name-directory load-file-name)))
 
 (defgroup chargebee-faces nil
-  "Faces used by Chargebee."
+  "Chargebee Faces."
   :group 'chargebee)
 
 (defface chargebee-section-head
   '((((background  dark)) :foreground "green")
     (((background light)) :foreground "black"))
-  "Fringe face for current position."
+  "Face for section head."
   :group 'chargebee-faces)
 
 (defface chargebee-yellow
   '((((background  dark)) :foreground "yellow")
     (((background light)) :foreground "black"))
-  "Fringe face for current position."
+  "Yellow face."
   :group 'chargebee-faces)
 
 (defface chargebee-red
   '((((background  dark)) :foreground "red")
     (((background light)) :foreground "black"))
-  "Fringe face for current position."
+  "Red face."
   :group 'chargebee-faces)
 
 (defface chargebee-highlight
@@ -45,15 +47,16 @@
   "Basic face for highlighting."
   :group 'chargebee-faces)
 
-(defun chargebee-customer (customer-id)
-  (interactive "sCustomer Id: ")
+(defun chargebee-customer (chargebee-customer-id)
+  (interactive "sCustomer Id: ") 
   (let ((buffer (get-buffer-create "*Chargebee-Customer*")))
     (with-current-buffer buffer
+      (setq-local chargebee-customer-id chargebee-customer-id)
       (erase-buffer))
 
     (deferred:$
       (deferred:$
-	(request-deferred (format "https://%s.chargebee.com/api/v2/customers/%s" chargebee-api-server customer-id)
+	(request-deferred (format "https://%s.chargebee.com/api/v2/customers/%s" chargebee-api-server chargebee-customer-id)
 			  :type "GET"
 			  :headers `(("Content-Type" . "application/json")
 				     ,(chargebee--authorization-header))
@@ -91,7 +94,7 @@
 		(insert ?\n)))))
 	(deferred:nextc it
 	  (lambda (response)
-	    (chargebee--write-invoices buffer customer-id nil '()))))
+	    (chargebee--write-invoices buffer chargebee-customer-id nil '()))))
 
       (deferred:error it
 	(lambda (err)
@@ -103,16 +106,17 @@
 	  (with-current-buffer buffer
 	    (outline-minor-mode)
 	    (setq-local outline-regexp ">")
+
 	    ;; Set keybinding for toggling sections
 	    (define-key outline-minor-mode-map (kbd "<tab>") 'outline-toggle-children)
 	    (font-lock-mode)
 
+	    (chargebee-minor-mode-activate)
+
 	    (switch-to-buffer buffer)
 	    (add-hook 'post-command-hook #'chargebee--highlight-current-line nil t)
-	    (chargebee--highlight-current-line)
-	    ))))))
-;; (chargebee-customer "123")
-;; (chargebee-customer "stage_77882")
+	    (goto-line 1)
+	    (chargebee--highlight-current-line)))))))
 
 (defun chargebee--write-invoices (buffer customer-id offset pages-history)
   (message "chargebee--write-invoices: %s %s" offset pages-history)
@@ -122,7 +126,7 @@
 		      :type "GET"
 		      :params `(
 				("customer_id[is]" . ,customer-id)
-				("limit" . "2")
+				("limit" . "5")
 				("offset" . ,(or offset "")))
 		      :headers `(("Content-Type" . "application/json")
 				 ,(chargebee--authorization-header))

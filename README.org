@@ -1,5 +1,7 @@
 * Usage
+
 Put this in your init.el file:
+
 #+BEGIN_SRC emacs-lisp
 ;; Chargebee
 (load (concat user-emacs-directory "chargebee.el/chargebee.el"))
@@ -9,7 +11,12 @@ Put this in your init.el file:
   (chargebee-api-server "your-api-server")
   (chargebee-api-key "your-api-key"))
 #+END_SRC
+
 * Chargebee Customer Buffer Example
+
 #+CAPTION: Chargebee Customer Buffer Example
 #+NAME:   fig:CHARGEBEE-CUSTOMER-BUFFER-EXAMPLE
 [[./chargebee-customer-buffer-example.png]]
+
+* Shortcuts 
+C-c g: Reload chargebee customer buffer
