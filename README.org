@@ -18,5 +18,9 @@ Put this in your init.el file:
 #+NAME:   fig:CHARGEBEE-CUSTOMER-BUFFER-EXAMPLE
 [[./chargebee-customer-buffer-example.png]]
 
+#+CAPTION: Chargebee Customer Buffer Example Video
+#+NAME:   fig:CHARGEBEE-CUSTOMER-BUFFER-EXAMPLE-VIDEO
+[[./emacs-chargebee-noaudio.gif]]
+
 * Shortcuts 
 C-c g: Reload chargebee customer buffer
