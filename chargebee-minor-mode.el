@@ -13,6 +13,8 @@
   (interactive)
   (chargebee-customer chargebee-customer-id))
 
+;; TODO - Add keys C-c n and C-c p to call previous and next button behaviors, to do that it's needed to encapsulate these behaviors into functions and control the limits between the pages
+
 (defun chargebee-minor-mode-activate ()
   (setq chargebee-minor-mode t))
 

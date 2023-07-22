@@ -4,7 +4,7 @@ Put this in your init.el file:
 
 #+BEGIN_SRC emacs-lisp
 ;; Chargebee
-(load (concat user-emacs-directory "chargebee.el/chargebee.el"))
+(load "~/<clone-directory>/chargebee.el/chargebee.el") ;; replace <clone-directory> by the directory where you cloned the project in
 (use-package chargebee
   :ensure nil
   :custom
@@ -14,13 +14,18 @@ Put this in your init.el file:
 
 * Chargebee Customer Buffer Example
 
+** Screenshot
+
 #+CAPTION: Chargebee Customer Buffer Example
 #+NAME:   fig:CHARGEBEE-CUSTOMER-BUFFER-EXAMPLE
-[[./chargebee-customer-buffer-example.png]]
+[[./resources/chargebee-customer-buffer-example.png]]
 
-#+CAPTION: Chargebee Customer Buffer Example Video
+** GIF
+
+#+CAPTION: Chargebee Customer Buffer Example GIF
 #+NAME:   fig:CHARGEBEE-CUSTOMER-BUFFER-EXAMPLE-VIDEO
-[[./emacs-chargebee-noaudio.gif]]
+[[./resources/emacs-chargebee-noaudio.gif]]
 
 * Shortcuts 
+
 C-c g: Reload chargebee customer buffer
